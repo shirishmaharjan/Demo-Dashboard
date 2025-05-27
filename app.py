@@ -2,14 +2,72 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import plotly.express as px # For more interactive charts like pie charts
+import plotly.express as px
 
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Urban Health Data Hub Demo")
 
-# --- Load Data ---
-@st.cache_data # Cache the data loading to improve performance
+# --- Language Setup ---
+translations = {
+    "English": {
+        "hub_title": "Urban Health Data Hub", "filters_options": "Filters & Options",
+        "select_ward": "Select Ward:", "all_wards": "All Wards",
+        "select_indicator_bar_box": "Select Indicator for Bar/Box Plot:",
+        "dashboard_title": "🏙️ Budhanilkantha Health Dashboard",
+        "key_metrics_header": "Key Metrics (Overall City)",
+        "total_population": "Total Population", "avg_diabetes_prev": "Avg. Diabetes Prevalence",
+        "Diabetes Prevalence": "Diabetes Prevalence", "Hypertension Prevalence": "Hypertension Prevalence", # For indicator options
+        "Flu Prevalence": "Flu Prevalence", "Access to Sanitation (%)": "Access to Sanitation (%)",
+        "Average Income (USD)": "Average Income (USD)", "Number of Clinics": "Number of Clinics",
+        "Average Age": "Average Age", "Population": "Population",
+        "view_raw_data": "View Raw Data",
+        # ... Add ALL your strings
+    },
+    "नेपाली": {
+        "hub_title": "शहरी स्वास्थ्य डेटा हब", "filters_options": "फिल्टर र विकल्पहरू",
+        "select_ward": "वार्ड छान्नुहोस्:", "all_wards": "सबै वार्डहरू",
+        "select_indicator_bar_box": "बार/बक्स प्लटका लागि सूचक छान्नुहोस्:",
+        "dashboard_title": "🏙️ बुढानिलकण्ठ स्वास्थ्य ड्यासबोर्ड",
+        "key_metrics_header": "मुख्य मेट्रिक्स (समग्र शहर)",
+        "total_population": "कुल जनसंख्या", "avg_diabetes_prev": "औसत मधुमेह व्यापकता",
+        "Diabetes Prevalence": "मधुमेहको व्यापकता", "Hypertension Prevalence": "उच्च रक्तचापको व्यापकता",
+        "Flu Prevalence": "फ्लूको व्यापकता", "Access to Sanitation (%)": "सरसफाइमा पहुँच (%)",
+        "Average Income (USD)": "औसत आय (USD)", "Number of Clinics": "क्लिनिक संख्या",
+        "Average Age": "औसत उमेर", "Population": "जनसंख्या",
+        "view_raw_data": "कच्चा डाटा हेर्नुहोस्",
+        # ... Add ALL your strings
+    }
+}
+
+# --- Sidebar START ---
+st.sidebar.title(_("hub_title", lang=st.session_state.language)) # Access language from session state
+st.sidebar.markdown(f"## {_('filters_options', lang=st.session_state.language)}")
+# --- Sidebar END ---
+
+# Initialize session state for language if not already set
+if 'language' not in st.session_state:
+    st.session_state.language = "English" # Default language
+
+def set_language():
+    # Callback function to update language in session state
+    st.session_state.language = st.session_state.lang_select
+
+# Language selector in the sidebar (place it early)
+st.sidebar.selectbox(
+    "भाषा छान्नुहोस् / Select Language",
+    options=["English", "नेपाली"],
+    key="lang_select", # Unique key for the selectbox
+    on_change=set_language # Callback when selection changes
+)
+
+def _(key, **kwargs):
+    lang = st.session_state.language # Use language from session state
+    return translations[lang].get(key, key).format(**kwargs)
+
+# --- Load Data --- (Keep as is, data column names are internal)
+@st.cache_data
 def load_data(file_path):
+    # ... your existing load_data function ...
     try:
         df = pd.read_csv(file_path)
         # Calculate prevalence rates (per 1000 people for example)
@@ -20,22 +78,23 @@ def load_data(file_path):
     except FileNotFoundError:
         st.error(f"Error: The file {file_path} was not found. Make sure it's in the same directory as app.py.")
         return pd.DataFrame()
-
 data = load_data("urban_health_data.csv")
 
-# --- Sidebar ---
-st.sidebar.title("Urban Health Data Hub")
-st.sidebar.markdown("## Filters & Options")
 
+# --- Sidebar CONTINUED ---
 # Ward Selector
-selected_ward = st.sidebar.selectbox(
-    "Select Ward (for detailed view & some charts):",
-    options=['All Wards'] + list(data['Ward'].unique()) if not data.empty else ['All Wards'],
+all_wards_text = _("all_wards")
+ward_options_display = [all_wards_text] + (list(data['Ward'].unique()) if not data.empty else []) # Assuming Ward names in data don't need translation for filtering
+selected_ward_display_name = st.sidebar.selectbox(
+    _("select_ward"),
+    options=ward_options_display,
     index=0
 )
+selected_ward = selected_ward_display_name if selected_ward_display_name != all_wards_text else 'All Wards'
 
-# Health Indicator Selector for general charts
-indicator_options = {
+
+# Health Indicator Selector
+indicator_options_internal = { # These are internal keys, keep them consistent
     "Diabetes Prevalence": "Diabetes_Prevalence_per_1000",
     "Hypertension Prevalence": "Hypertension_Prevalence_per_1000",
     "Flu Prevalence": "Flu_Prevalence_per_1000",
@@ -45,178 +104,60 @@ indicator_options = {
     "Average Age": "Avg_Age",
     "Population": "Population"
 }
-selected_indicator_key = st.sidebar.selectbox(
-    "Select Indicator for Bar/Box Plot:",
-    options=list(indicator_options.keys()) if not data.empty else [],
+
+# Create translated display options for the selectbox
+translated_indicator_display_map = {_(key): key for key in indicator_options_internal.keys()}
+
+selected_display_indicator_name = st.sidebar.selectbox(
+    _("select_indicator_bar_box"),
+    options=list(translated_indicator_display_map.keys()) if not data.empty else [],
     index=0
 )
-selected_indicator_col = indicator_options.get(selected_indicator_key) # Use .get for safety
+selected_indicator_key = translated_indicator_display_map.get(selected_display_indicator_name) # Original English key
+selected_indicator_col = indicator_options_internal.get(selected_indicator_key)
+
 
 # --- Main Dashboard Area ---
-st.title("🏙️ Budhanilkantha Municipality - Health Dashboard (Demo)")
-st.markdown("A prototype dashboard to visualize urban health data.")
+st.title(_("dashboard_title"))
+# ... and so on for all text elements ...
 
-if not data.empty and selected_indicator_col: # Ensure data and indicator are loaded
+# When using selected_indicator_key for display in titles/markdown:
+if selected_indicator_key: # Make sure it's not None
+    st.markdown(f"**{_(selected_indicator_key)} by Ward (Bar Chart)**") # Translate the display key
+    # ... in plot titles, use _(selected_indicator_key) ...
+else:
+    st.warning("Please select an indicator.")
+
+
+if not data.empty and selected_indicator_col:
     # --- Key Metrics ---
-    st.header("Key Metrics (Overall City)")
+    st.header(_("key_metrics_header"))
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Population", f"{data['Population'].sum():,}")
-    col2.metric("Avg. Diabetes Prevalence", f"{data['Diabetes_Prevalence_per_1000'].mean():.2f} per 1000")
-    col3.metric("Avg. Hypertension Prevalence", f"{data['Hypertension_Prevalence_per_1000'].mean():.2f} per 1000")
-    col4.metric("Total Clinics", data['Num_Clinics'].sum())
-
-    st.markdown("---")
+    col1.metric(_("total_population"), f"{data['Population'].sum():,}")
+    col2.metric(_("avg_diabetes_prev"), f"{data['Diabetes_Prevalence_per_1000'].mean():.2f} per 1000")
+    # ... more metrics with translated labels ...
 
     # --- Data View (Expandable) ---
-    with st.expander("View Raw Data"):
+    with st.expander(_("view_raw_data")):
         if selected_ward == 'All Wards':
             st.dataframe(data)
         else:
             st.dataframe(data[data['Ward'] == selected_ward])
-
-    st.markdown("---")
-
-    # --- Visualizations ---
-    st.header("Visualizations")
-
-    # Row 1: Bar Chart and Pie Chart
-    st.subheader("Ward Comparisons")
-    viz_row1_col1, viz_row1_col2 = st.columns(2)
-
-    with viz_row1_col1:
-        st.markdown(f"**{selected_indicator_key} by Ward (Bar Chart)**")
-        fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
-        sns.barplot(x='Ward', y=selected_indicator_col, data=data, ax=ax_bar, palette="viridis")
-        plt.xticks(rotation=45, ha='right')
-        plt.ylabel(selected_indicator_key)
-        plt.title(f"{selected_indicator_key} Across Wards")
-        st.pyplot(fig_bar)
-
-    with viz_row1_col2:
-        st.markdown("**Population Distribution by Ward (Pie Chart)**")
-        fig_pie = px.pie(data, values='Population', names='Ward', title='Population Proportion by Ward',
-                         color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    st.markdown("---")
-
-    # Row 2: Scatter Plot and Line Chart
-    st.subheader("Relationships and Trends")
-    viz_row2_col1, viz_row2_col2 = st.columns(2)
-
-    with viz_row2_col1:
-        st.markdown("**Explore Relationships (Scatter Plot)**")
-        # Scatter plot options
-        x_axis_options = [col for col in data.columns if pd.api.types.is_numeric_dtype(data[col])]
-        y_axis_options = x_axis_options
-
-        x_axis = st.selectbox("Select X-axis for Scatter Plot:", x_axis_options, index=x_axis_options.index('Avg_Income_USD') if 'Avg_Income_USD' in x_axis_options else 0)
-        y_axis = st.selectbox("Select Y-axis for Scatter Plot:", y_axis_options, index=y_axis_options.index('Diabetes_Prevalence_per_1000') if 'Diabetes_Prevalence_per_1000' in y_axis_options else 1)
-
-        if x_axis and y_axis:
-            fig_scatter = px.scatter(data, x=x_axis, y=y_axis, color='Ward',
-                                     title=f'{y_axis} vs. {x_axis}',
-                                     labels={x_axis: x_axis.replace('_', ' '), y_axis: y_axis.replace('_', ' ')},
-                                     hover_data=['Population'])
-            st.plotly_chart(fig_scatter, use_container_width=True)
-
-    with viz_row2_col2:
-        st.markdown("**Indicator Comparison Across Wards (Line Chart)**")
-        # Multi-select for line chart indicators
-        line_chart_indicators = st.multiselect(
-            "Select indicators for Line Chart:",
-            options=[col for col in data.columns if pd.api.types.is_numeric_dtype(data[col]) and col not in ['Population', 'Num_Clinics', 'Avg_Age']], # Exclude some less comparable ones
-            default=['Diabetes_Prevalence_per_1000', 'Hypertension_Prevalence_per_1000']
-        )
-        if line_chart_indicators:
-            line_df = data.set_index('Ward')[line_chart_indicators]
-            st.line_chart(line_df) # Streamlit's native line chart
-        else:
-            st.info("Select at least one indicator for the line chart.")
-
-
-    st.markdown("---")
-
-    # Row 3: Box Plot and Histogram
-    st.subheader("Distribution Analysis")
-    viz_row3_col1, viz_row3_col2 = st.columns(2)
-
-    with viz_row3_col1:
-        st.markdown(f"**Distribution of {selected_indicator_key} by Ward (Box Plot)**")
-        fig_box, ax_box = plt.subplots(figsize=(10, 6))
-        # For a box plot to be meaningful across wards with single values per ward,
-        # we'd typically compare distributions if we had multiple data points per ward.
-        # Here, we'll show it, but it will look like single lines unless we had more granular data.
-        # A more typical use would be: sns.boxplot(x='SomeCategory', y='Value', data=df_with_multiple_obs_per_category)
-        # For this demo, we'll use it to compare the single values, which isn't its strongest use case but demonstrates the plot type.
-        # A better use for this data would be if selected_indicator_col represented individual patient data, grouped by ward.
-        # Since we only have aggregate data per ward, we'll plot the values directly for comparison.
-        if selected_indicator_col:
-            sns.boxplot(x='Ward', y=selected_indicator_col, data=data, ax=ax_box, palette="Set2")
-            # sns.swarmplot(x='Ward', y=selected_indicator_col, data=data, color=".25", ax=ax_box) # Optionally overlay points
-            plt.xticks(rotation=45, ha='right')
-            plt.ylabel(selected_indicator_key)
-            plt.title(f"Distribution of {selected_indicator_key}")
-            st.pyplot(fig_box)
-        else:
-            st.info("Select an indicator for the box plot.")
-
-
-    with viz_row3_col2:
-        st.markdown("**Frequency Distribution (Histogram)**")
-        hist_indicator_key = st.selectbox(
-            "Select Indicator for Histogram:",
-            options=list(indicator_options.keys()),
-            index=list(indicator_options.keys()).index('Avg_Age') # Default to Avg_Age
-        )
-        hist_indicator_col = indicator_options.get(hist_indicator_key)
-        if hist_indicator_col:
-            fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
-            sns.histplot(data[hist_indicator_col], kde=True, ax=ax_hist, color="skyblue")
-            plt.xlabel(hist_indicator_key)
-            plt.ylabel("Frequency")
-            plt.title(f"Distribution of {hist_indicator_key}")
-            st.pyplot(fig_hist)
-        else:
-            st.info("Select an indicator for the histogram.")
-
-    st.markdown("---")
-
-    # Correlation Matrix (kept from previous example)
-    st.subheader("Correlation Analysis")
-    if len(data.columns) > 1:
-        numeric_cols = data.select_dtypes(include=['number']).columns
-        if len(numeric_cols) > 1:
-            correlation_matrix = data[numeric_cols].corr()
-            fig_corr, ax_corr = plt.subplots(figsize=(10,8)) # Increased size
-            sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=.5, ax=ax_corr)
-            plt.title("Correlation Matrix of Numeric Features")
-            st.pyplot(fig_corr)
-        else:
-            st.write("Not enough numeric columns for a correlation matrix.")
-
-    # Detailed view for a selected ward
-    if selected_ward != 'All Wards':
-        st.subheader(f"Detailed Metrics for {selected_ward}")
-        ward_data_selected = data[data['Ward'] == selected_ward].iloc[0]
-        details_col1, details_col2 = st.columns(2)
-        with details_col1:
-            st.metric("Population", f"{ward_data_selected['Population']:,}")
-            st.metric("Diabetes Cases", f"{ward_data_selected['Diabetes_Cases']} ({ward_data_selected['Diabetes_Prevalence_per_1000']:.2f} per 1000)")
-            st.metric("Hypertension Cases", f"{ward_data_selected['Hypertension_Cases']} ({ward_data_selected['Hypertension_Prevalence_per_1000']:.2f} per 1000)")
-        with details_col2:
-            st.metric("Flu Cases", f"{ward_data_selected['Flu_Cases']} ({ward_data_selected['Flu_Prevalence_per_1000']:.2f} per 1000)")
-            st.metric("Access to Sanitation", f"{ward_data_selected['Access_to_Sanitation_Pct']}%")
-            st.metric("Average Income", f"${ward_data_selected['Avg_Income_USD']:,}")
-            st.metric("Number of Clinics", ward_data_selected['Num_Clinics'])
+    # ... rest of your dashboard code, applying _() to all user-facing strings ...
+    # For plot titles and labels:
+    # fig_bar.set_title(_(f"{selected_indicator_key} Across Wards")) # If selected_indicator_key itself needs translation
+    # fig_bar.set_ylabel(_(selected_indicator_key))
+    # For plotly charts:
+    # fig_pie.update_layout(title_text=_('Population Proportion by Ward'))
+    # fig_scatter.update_layout(title_text=_(f'{y_axis_display} vs. {x_axis_display}'),
+    #                           xaxis_title=_(x_axis_display), yaxis_title=_(y_axis_display))
+    # (where x_axis_display and y_axis_display are translated versions of column names if needed)
 
 else:
-    st.warning("Data could not be loaded or indicator not selected. Please check the CSV file and selections.")
+    if data.empty:
+        st.warning("Data could not be loaded. Please check the CSV file.")
+    else: # Implies selected_indicator_col is None
+        st.info("Please select an indicator from the sidebar to view charts.")
 
 st.sidebar.markdown("---")
-st.sidebar.info(
-    "This is a simplified demo of an Urban Health Data Hub. "
-    "Real-world hubs involve complex data integration, privacy considerations, "
-    "and more advanced analytics."
-)
+st.sidebar.info(_("sidebar_info"))
