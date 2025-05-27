@@ -1,0 +1,9 @@
+Ward,Population,Avg_Age,Diabetes_Cases,Hypertension_Cases,Flu_Cases,Access_to_Sanitation_Pct,Avg_Income_USD,Num_Clinics
+Ward A,5000,35,250,400,150,60,1200,2
+Ward B,7500,32,300,500,200,75,1500,3
+Ward C,3000,42,200,350,100,50,900,1
+Ward D,6000,38,280,450,180,85,1800,4
+Ward E,4500,30,180,300,120,65,1100,2
+Ward F,8000,40,400,600,250,90,2000,5
+Ward G,2500,28,100,150,80,40,700,1
+Ward H,5500,36,270,420,160,70,1300,3
